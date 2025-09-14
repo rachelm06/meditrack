@@ -1,0 +1,33 @@
+date,item_name,category,quantity_used,cost_per_unit,supplier,expiration_risk
+2023-01-01,N95 Masks,PPE,250,2.50,MedSupply Co,Low
+2023-01-01,Surgical Gloves,PPE,480,0.35,SafeHands Inc,Low
+2023-01-01,Hand Sanitizer,PPE,45,8.99,CleanCorp,Medium
+2023-01-01,Acetaminophen,Medication,120,0.15,PharmaCorp,High
+2023-01-01,Ibuprofen,Medication,95,0.22,MediCare Supply,Medium
+2023-01-01,Syringes,General Supplies,340,0.08,MedEquip Ltd,Low
+2023-01-01,Bandages,General Supplies,180,0.45,FirstAid Pro,Low
+2023-01-01,IV Bags,General Supplies,78,12.50,FluidTech,Medium
+2023-01-02,N95 Masks,PPE,235,2.50,MedSupply Co,Low
+2023-01-02,Surgical Gloves,PPE,465,0.35,SafeHands Inc,Low
+2023-01-02,Hand Sanitizer,PPE,42,8.99,CleanCorp,Medium
+2023-01-02,Acetaminophen,Medication,115,0.15,PharmaCorp,High
+2023-01-02,Ibuprofen,Medication,88,0.22,MediCare Supply,Medium
+2023-01-02,Syringes,General Supplies,325,0.08,MedEquip Ltd,Low
+2023-01-02,Bandages,General Supplies,172,0.45,FirstAid Pro,Low
+2023-01-02,IV Bags,General Supplies,74,12.50,FluidTech,Medium
+2023-01-03,N95 Masks,PPE,248,2.50,MedSupply Co,Low
+2023-01-03,Surgical Gloves,PPE,475,0.35,SafeHands Inc,Low
+2023-01-03,Hand Sanitizer,PPE,44,8.99,CleanCorp,Medium
+2023-01-03,Acetaminophen,Medication,118,0.15,PharmaCorp,High
+2023-01-03,Ibuprofen,Medication,92,0.22,MediCare Supply,Medium
+2023-01-03,Syringes,General Supplies,335,0.08,MedEquip Ltd,Low
+2023-01-03,Bandages,General Supplies,176,0.45,FirstAid Pro,Low
+2023-01-03,IV Bags,General Supplies,76,12.50,FluidTech,Medium
+2023-01-04,N95 Masks,PPE,268,2.50,MedSupply Co,Low
+2023-01-04,Surgical Gloves,PPE,512,0.35,SafeHands Inc,Low
+2023-01-04,Hand Sanitizer,PPE,48,8.99,CleanCorp,Medium
+2023-01-04,Acetaminophen,Medication,128,0.15,PharmaCorp,High
+2023-01-04,Ibuprofen,Medication,102,0.22,MediCare Supply,Medium
+2023-01-04,Syringes,General Supplies,365,0.08,MedEquip Ltd,Low
+2023-01-04,Bandages,General Supplies,192,0.45,FirstAid Pro,Low
+2023-01-04,IV Bags,General Supplies,84,12.50,FluidTech,Medium
