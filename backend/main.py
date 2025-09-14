@@ -152,7 +152,7 @@ async def get_dashboard_metrics():
     try:
         inventory_data = db_manager.get_current_inventory()
         total_items = len(inventory_data)
-        low_stock_items = len([item for item in inventory_data if item["current_stock"] / item["usage_rate"] < 14])
+        low_stock_items = len([item for item in inventory_data if item["usage_rate"] > 0 and item["current_stock"] / item["usage_rate"] < 14])
         total_value = sum(item["current_stock"] * item["cost_per_unit"] for item in inventory_data)
 
         return {

@@ -1,0 +1,6 @@
+Item Name	Department	Current Qty	Reorder Point	Maximum Stock	Cost per Unit	Vendor
+Oxygen Tank	Respiratory	45	20	100	85.00	OxygenCorp
+IV Bags 500ml	IV Therapy	125	50	300	3.25	FluidCorp
+Thermometers Digital	General	35	15	75	12.50	TempTech
+Wheelchair	Mobility	8	3	15	450.00	MobilityPlus
+Defibrillator Pads	Emergency	22	10	50	25.75	EmergencySupply

@@ -6,7 +6,9 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ExclamationCircleIcon,
-  ArrowDownTrayIcon
+  ArrowDownTrayIcon,
+  InformationCircleIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 
 const Import = () => {
@@ -56,10 +58,10 @@ const Import = () => {
   };
 
   const handleFile = async (file) => {
-    if (!file.name.match(/\.(csv|xlsx|xls)$/i)) {
+    if (!file.name.match(/\.(csv|xlsx|xls|pdf|docx|txt)$/i)) {
       setUploadResult({
         success: false,
-        message: 'Please select a CSV or Excel file'
+        message: 'Please select a supported file format (CSV, Excel, PDF, Word, or Text)'
       });
       return;
     }
@@ -145,6 +147,123 @@ const Import = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  const ConfidenceIndicator = ({ confidence, accuracyInfo }) => {
+    if (!accuracyInfo) return null;
+
+    const getColorClasses = (color) => {
+      switch (color) {
+        case 'green':
+          return {
+            bg: 'bg-green-50',
+            border: 'border-green-200',
+            text: 'text-green-800',
+            icon: 'text-green-500'
+          };
+        case 'blue':
+          return {
+            bg: 'bg-blue-50',
+            border: 'border-blue-200',
+            text: 'text-blue-800',
+            icon: 'text-blue-500'
+          };
+        case 'yellow':
+          return {
+            bg: 'bg-yellow-50',
+            border: 'border-yellow-200',
+            text: 'text-yellow-800',
+            icon: 'text-yellow-500'
+          };
+        case 'red':
+          return {
+            bg: 'bg-red-50',
+            border: 'border-red-200',
+            text: 'text-red-800',
+            icon: 'text-red-500'
+          };
+        default:
+          return {
+            bg: 'bg-gray-50',
+            border: 'border-gray-200',
+            text: 'text-gray-800',
+            icon: 'text-gray-500'
+          };
+      }
+    };
+
+    const colorClasses = getColorClasses(accuracyInfo.color);
+
+    return (
+      <div className={`${colorClasses.bg} ${colorClasses.border} border rounded-lg p-4 mt-3`}>
+        <div className="flex items-start space-x-3">
+          <div className="flex-shrink-0">
+            {accuracyInfo.needs_human_review ? (
+              <ExclamationTriangleIcon className={`h-6 w-6 ${colorClasses.icon}`} />
+            ) : (
+              <InformationCircleIcon className={`h-6 w-6 ${colorClasses.icon}`} />
+            )}
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center space-x-2">
+              <h4 className={`text-sm font-medium ${colorClasses.text}`}>
+                {accuracyInfo.description} ({confidence.toFixed(1)}% confidence)
+              </h4>
+            </div>
+            <p className={`mt-1 text-sm ${colorClasses.text} opacity-90`}>
+              {accuracyInfo.interpretation}
+            </p>
+
+            {/* Accuracy Metrics */}
+            <div className="mt-3 grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <span className="font-medium">Labeling Accuracy:</span>
+                <span className="ml-1">{accuracyInfo.labeling_accuracy_estimate}%</span>
+              </div>
+              <div>
+                <span className="font-medium">Critical Fields:</span>
+                <span className="ml-1">{accuracyInfo.critical_fields_mapped}</span>
+              </div>
+            </div>
+
+            {/* Human Review Warning */}
+            {accuracyInfo.needs_human_review && (
+              <div className="mt-3 p-2 bg-yellow-100 border border-yellow-300 rounded text-xs">
+                <div className="flex items-center">
+                  <ExclamationTriangleIcon className="h-4 w-4 text-yellow-600 mr-2" />
+                  <span className="font-medium text-yellow-800">Human Review Recommended</span>
+                </div>
+                <p className="text-yellow-700 mt-1">{accuracyInfo.review_reason}</p>
+              </div>
+            )}
+
+            {/* Issues */}
+            {accuracyInfo.issues && accuracyInfo.issues.length > 0 && (
+              <div className="mt-3">
+                <p className={`text-xs font-medium ${colorClasses.text} mb-1`}>Issues Detected:</p>
+                <ul className={`text-xs ${colorClasses.text} opacity-90 list-disc list-inside space-y-1`}>
+                  {accuracyInfo.issues.map((issue, index) => (
+                    <li key={index}>{issue}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Recommendations */}
+            {accuracyInfo.recommendations && accuracyInfo.recommendations.length > 0 && (
+              <div className="mt-3">
+                <p className={`text-xs font-medium ${colorClasses.text} mb-1`}>Recommendations:</p>
+                <ul className={`text-xs ${colorClasses.text} opacity-90 list-disc list-inside space-y-1`}>
+                  {accuracyInfo.recommendations.map((rec, index) => (
+                    <li key={index}>{rec}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -190,8 +309,8 @@ const Import = () => {
             </h2>
             <p className="mt-1 text-sm text-gray-600">
               {activeTab === 'inventory'
-                ? 'Upload CSV or Excel files containing inventory information'
-                : 'Upload CSV or Excel files containing usage and prescription data'
+                ? 'Upload files containing inventory information in any format (CSV, Excel, PDF, Word, Text)'
+                : 'Upload files containing usage and prescription data in any format (CSV, Excel, PDF, Word, Text)'
               }
             </p>
           </div>
@@ -228,13 +347,13 @@ const Import = () => {
                   name="file-upload"
                   type="file"
                   className="sr-only"
-                  accept=".csv,.xlsx,.xls"
+                  accept=".csv,.xlsx,.xls,.pdf,.docx,.txt"
                   onChange={handleFileSelect}
                   disabled={isUploading}
                 />
               </label>
               <p className="mt-2 text-xs text-gray-500">
-                CSV, XLSX, or XLS up to 10MB
+                CSV, XLSX, XLS, PDF, DOCX, or TXT up to 10MB
               </p>
             </div>
           </div>
@@ -277,6 +396,14 @@ const Import = () => {
                       <p>Import ID: {uploadResult.import_id}</p>
                     )}
                   </div>
+                )}
+
+                {/* Confidence and Accuracy Information */}
+                {uploadResult && uploadResult.accuracy_assessment && (
+                  <ConfidenceIndicator
+                    confidence={uploadResult.confidence || 0}
+                    accuracyInfo={uploadResult.accuracy_assessment}
+                  />
                 )}
                 {uploadResult.errors && uploadResult.errors.length > 0 && (
                   <div className="mt-3">

@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple, Any
 from pydantic import BaseModel, ValidationError, validator
 import chardet
 import json
+from universal_parser import UniversalFileParser
 
 class ImportResult(BaseModel):
     success: bool
@@ -14,6 +15,8 @@ class ImportResult(BaseModel):
     failed_records: int = 0
     errors: List[str] = []
     import_id: Optional[str] = None
+    confidence: float = 0.0
+    accuracy_assessment: Optional[Dict[str, Any]] = None
 
 class InventoryImportRecord(BaseModel):
     item_name: str
@@ -93,6 +96,7 @@ class PrescriptionImportRecord(BaseModel):
 class ImportManager:
     def __init__(self, db_path: str = "healthcare_inventory.db"):
         self.db_path = db_path
+        self.parser = UniversalFileParser()
 
     def _get_connection(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path, check_same_thread=False)
@@ -102,19 +106,24 @@ class ImportManager:
         result = chardet.detect(file_content)
         return result['encoding'] or 'utf-8'
 
-    def _read_file_content(self, file_content: bytes, filename: str) -> pd.DataFrame:
-        """Read file content and return DataFrame"""
-        encoding = self._detect_encoding(file_content)
-
+    def _read_file_content(self, file_content: bytes, filename: str, data_type: str = 'inventory') -> Tuple[pd.DataFrame, Dict]:
+        """Read file content using universal parser and return DataFrame and metadata"""
         try:
-            if filename.endswith('.csv'):
-                return pd.read_csv(io.StringIO(file_content.decode(encoding)))
-            elif filename.endswith('.xlsx') or filename.endswith('.xls'):
-                return pd.read_excel(io.BytesIO(file_content))
-            else:
-                raise ValueError(f"Unsupported file format. Please use CSV or Excel files.")
+            result = self.parser.parse_file(file_content, filename, data_type)
+
+            if not result['success']:
+                raise ValueError(result['error'])
+
+            df = pd.DataFrame(result['data'])
+            metadata = result['metadata']
+
+            if df.empty:
+                raise ValueError("No data found in file")
+
+            return df, metadata
+
         except Exception as e:
-            raise ValueError(f"Error reading file: {str(e)}")
+            raise ValueError(f"Error parsing file: {str(e)}")
 
     def _create_import_record(self, import_type: str, filename: str, status: str) -> str:
         """Create an import record and return the import ID"""
@@ -156,14 +165,20 @@ class ImportManager:
         failed_records = 0
 
         try:
-            df = self._read_file_content(file_content, filename)
+            df, metadata = self._read_file_content(file_content, filename, 'inventory')
 
-            # Validate required columns
-            required_columns = ['item_name', 'category', 'current_stock', 'cost_per_unit']
+            # Check confidence level from universal parser
+            confidence = metadata.get('confidence', 0)
+            if confidence < 50:
+                error_msg = f"Low confidence ({confidence:.1f}%) in data parsing. Please check file format and column headers."
+                errors.append(error_msg)
+
+            # Validate required columns (using mapped columns)
+            required_columns = ['item_name']
             missing_columns = [col for col in required_columns if col not in df.columns]
 
             if missing_columns:
-                error_msg = f"Missing required columns: {', '.join(missing_columns)}"
+                error_msg = f"Missing required columns: {', '.join(missing_columns)}. Parsed columns: {list(df.columns)}"
                 self._update_import_record(import_id, "failed", 0, len(df), error_msg)
                 return ImportResult(
                     success=False,
@@ -177,8 +192,19 @@ class ImportManager:
 
             for index, row in df.iterrows():
                 try:
+                    # Create record dict with defaults for missing fields
+                    record_dict = {}
+                    record_dict['item_name'] = str(row.get('item_name', '')) if pd.notna(row.get('item_name')) else ''
+                    record_dict['category'] = str(row.get('category', 'Unknown')) if pd.notna(row.get('category')) else 'Unknown'
+                    record_dict['current_stock'] = int(float(row.get('current_stock', 0))) if pd.notna(row.get('current_stock')) else 0
+                    record_dict['min_stock_level'] = int(float(row.get('min_stock_level', 50))) if pd.notna(row.get('min_stock_level')) else 50
+                    record_dict['max_stock_level'] = int(float(row.get('max_stock_level', 1000))) if pd.notna(row.get('max_stock_level')) else 1000
+                    record_dict['cost_per_unit'] = float(row.get('cost_per_unit', 0)) if pd.notna(row.get('cost_per_unit')) else 0.0
+                    record_dict['supplier'] = str(row.get('supplier', '')) if pd.notna(row.get('supplier')) else None
+                    record_dict['expiration_risk'] = str(row.get('expiration_risk', 'Low')) if pd.notna(row.get('expiration_risk')) else 'Low'
+
                     # Validate record using Pydantic
-                    record = InventoryImportRecord(**row.to_dict())
+                    record = InventoryImportRecord(**record_dict)
 
                     # Check if item already exists
                     cursor.execute('SELECT id FROM inventory WHERE item_name = ?', (record.item_name,))
@@ -231,7 +257,9 @@ class ImportManager:
                 imported_records=imported_records,
                 failed_records=failed_records,
                 errors=errors,
-                import_id=import_id
+                import_id=import_id,
+                confidence=metadata.get('confidence', 0),
+                accuracy_assessment=metadata.get('accuracy_assessment', {})
             )
 
         except Exception as e:
@@ -251,14 +279,20 @@ class ImportManager:
         failed_records = 0
 
         try:
-            df = self._read_file_content(file_content, filename)
+            df, metadata = self._read_file_content(file_content, filename, 'usage')
 
-            # Validate required columns
-            required_columns = ['item_name', 'quantity_used', 'usage_date']
+            # Check confidence level from universal parser
+            confidence = metadata.get('confidence', 0)
+            if confidence < 50:
+                error_msg = f"Low confidence ({confidence:.1f}%) in data parsing. Please check file format and column headers."
+                errors.append(error_msg)
+
+            # Validate required columns (using mapped columns)
+            required_columns = ['item_name', 'quantity_used']
             missing_columns = [col for col in required_columns if col not in df.columns]
 
             if missing_columns:
-                error_msg = f"Missing required columns: {', '.join(missing_columns)}"
+                error_msg = f"Missing required columns: {', '.join(missing_columns)}. Parsed columns: {list(df.columns)}"
                 self._update_import_record(import_id, "failed", 0, len(df), error_msg)
                 return ImportResult(
                     success=False,
@@ -272,8 +306,18 @@ class ImportManager:
 
             for index, row in df.iterrows():
                 try:
+                    # Create record dict with defaults for missing fields
+                    record_dict = {}
+                    record_dict['item_name'] = str(row.get('item_name', '')) if pd.notna(row.get('item_name')) else ''
+                    record_dict['quantity_used'] = int(float(row.get('quantity_used', 0))) if pd.notna(row.get('quantity_used')) else 0
+                    record_dict['usage_date'] = str(row.get('usage_date', datetime.now().strftime('%Y-%m-%d'))) if pd.notna(row.get('usage_date')) else datetime.now().strftime('%Y-%m-%d')
+                    record_dict['department'] = str(row.get('department', '')) if pd.notna(row.get('department')) else None
+                    record_dict['patient_id'] = str(row.get('patient_id', '')) if pd.notna(row.get('patient_id')) else None
+                    record_dict['prescription_id'] = str(row.get('prescription_id', '')) if pd.notna(row.get('prescription_id')) else ''
+                    record_dict['notes'] = str(row.get('notes', '')) if pd.notna(row.get('notes')) else None
+
                     # Validate record using Pydantic
-                    record = UsageImportRecord(**row.to_dict())
+                    record = UsageImportRecord(**record_dict)
 
                     # Get cost per unit for calculation
                     cursor.execute('SELECT cost_per_unit FROM inventory WHERE item_name = ?',
@@ -322,7 +366,9 @@ class ImportManager:
                 imported_records=imported_records,
                 failed_records=failed_records,
                 errors=errors,
-                import_id=import_id
+                import_id=import_id,
+                confidence=metadata.get('confidence', 0),
+                accuracy_assessment=metadata.get('accuracy_assessment', {})
             )
 
         except Exception as e:

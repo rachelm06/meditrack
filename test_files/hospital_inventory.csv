@@ -1,0 +1,8 @@
+Medical Item,Category,Stock on Hand,Min Level,Max Capacity,Unit Price,Supplier Name,Risk Level
+Surgical Gloves,PPE,450,100,1000,0.85,MedSupply Corp,Low
+N95 Masks,PPE,250,200,800,2.50,SafetyFirst Inc,Medium
+Syringes 10ml,Medical Devices,180,75,500,0.45,DeviceCorp,Low
+Morphine 10mg,Pharmaceuticals,25,10,100,15.75,PharmaCorp,High
+Blood Pressure Cuff,Equipment,12,5,25,125.00,MedTech Solutions,Low
+Surgical Scissors,Instruments,8,3,20,89.50,SurgiTools,Low
+Bandages,Wound Care,320,150,600,1.25,CareSupplies,Low

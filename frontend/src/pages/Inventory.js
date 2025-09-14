@@ -1,16 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 const Inventory = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [editingItem, setEditingItem] = useState(null);
+  const [editingField, setEditingField] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newItem, setNewItem] = useState({
+    item_name: '',
+    category: '',
+    current_stock: 0,
+    min_stock_level: 0,
+    max_stock_level: 0,
+    cost_per_unit: 0,
+    supplier: '',
+    expiration_risk: 'Low'
+  });
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  // const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
   // Sample inventory data
-  const sampleInventory = [
+  const sampleInventory = useMemo(() => [
     {
       id: 1,
       item_name: 'Surgical Masks',
@@ -71,16 +84,14 @@ const Inventory = () => {
       expiration_risk: 'Low',
       usage_rate: 2
     }
-  ];
+  ], []);
 
   useEffect(() => {
-    // Simulate API call
+    // Load inventory data immediately
     setLoading(true);
-    setTimeout(() => {
-      setItems(sampleInventory);
-      setLoading(false);
-    }, 1000);
-  }, []);
+    setItems(sampleInventory);
+    setLoading(false);
+  }, [sampleInventory]);
 
   const getStockStatus = (current, min, max) => {
     if (current <= min * 0.5) return 'critical';
@@ -105,6 +116,94 @@ const Inventory = () => {
       case 'high': return 'Overstocked';
       default: return 'Normal';
     }
+  };
+
+  const handleEdit = (item, field) => {
+    setEditingItem(item.id);
+    setEditingField(field);
+  };
+
+  const handleSave = async (item, field, value) => {
+    try {
+      // Update local state
+      const updatedItems = items.map(i =>
+        i.id === item.id ? { ...i, [field]: parseFloat(value) || value } : i
+      );
+      setItems(updatedItems);
+      setEditingItem(null);
+      setEditingField(null);
+
+      // TODO: Send update to backend API
+      console.log(`Updated item ${item.id}: ${field} = ${value}`);
+    } catch (error) {
+      console.error('Error updating item:', error);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditingItem(null);
+    setEditingField(null);
+  };
+
+  const handleAddNew = async () => {
+    try {
+      const newItemWithId = {
+        ...newItem,
+        id: Math.max(...items.map(i => i.id), 0) + 1,
+        usage_rate: 0
+      };
+      setItems([...items, newItemWithId]);
+      setNewItem({
+        item_name: '',
+        category: '',
+        current_stock: 0,
+        min_stock_level: 0,
+        max_stock_level: 0,
+        cost_per_unit: 0,
+        supplier: '',
+        expiration_risk: 'Low'
+      });
+      setShowAddForm(false);
+
+      // TODO: Send to backend API
+      console.log('Added new item:', newItemWithId);
+    } catch (error) {
+      console.error('Error adding item:', error);
+    }
+  };
+
+  const EditableCell = ({ item, field, type = 'text' }) => {
+    const isEditing = editingItem === item.id && editingField === field;
+    const value = item[field];
+
+    if (isEditing) {
+      return (
+        <input
+          type={type}
+          defaultValue={value}
+          className="w-full px-2 py-1 border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          autoFocus
+          onBlur={(e) => handleSave(item, field, e.target.value)}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              handleSave(item, field, e.target.value);
+            } else if (e.key === 'Escape') {
+              handleCancel();
+            }
+          }}
+        />
+      );
+    }
+
+    return (
+      <div
+        className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+        onClick={() => handleEdit(item, field)}
+        title="Click to edit"
+      >
+        {type === 'number' && field.includes('cost') ? `$${parseFloat(value).toFixed(2)}` : value}
+      </div>
+    );
   };
 
   const filteredItems = items.filter(item => {
@@ -132,8 +231,18 @@ const Inventory = () => {
   return (
     <div className="px-4 py-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
-        <p className="mt-2 text-gray-600">Manage your healthcare inventory items and stock levels</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
+            <p className="mt-2 text-gray-600">Manage your healthcare inventory items and stock levels - click any value to edit</p>
+          </div>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Add New Item
+          </button>
+        </div>
       </div>
 
       {/* Search and Filter */}
@@ -199,27 +308,44 @@ const Inventory = () => {
                 const status = getStockStatus(item.current_stock, item.min_stock_level, item.max_stock_level);
                 return (
                   <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="font-medium text-gray-900">{item.item_name}</td>
-                    <td className="text-gray-600">{item.category}</td>
-                    <td className="font-medium">{item.current_stock}</td>
+                    <td className="font-medium text-gray-900">
+                      <EditableCell item={item} field="item_name" />
+                    </td>
+                    <td className="text-gray-600">
+                      <EditableCell item={item} field="category" />
+                    </td>
+                    <td className="font-medium">
+                      <EditableCell item={item} field="current_stock" type="number" />
+                    </td>
                     <td className="text-sm text-gray-500">
-                      {item.min_stock_level} - {item.max_stock_level}
+                      <div className="flex items-center space-x-2">
+                        <EditableCell item={item} field="min_stock_level" type="number" />
+                        <span>-</span>
+                        <EditableCell item={item} field="max_stock_level" type="number" />
+                      </div>
                     </td>
                     <td>
                       <span className={`status-indicator ${getStatusColor(status)}`}>
                         {getStatusText(status)}
                       </span>
                     </td>
-                    <td className="text-gray-600">${item.cost_per_unit.toFixed(2)}</td>
+                    <td className="text-gray-600">
+                      <EditableCell item={item} field="cost_per_unit" type="number" />
+                    </td>
                     <td className="text-gray-600">{item.usage_rate}/day</td>
-                    <td className="text-gray-600">{item.supplier}</td>
+                    <td className="text-gray-600">
+                      <EditableCell item={item} field="supplier" />
+                    </td>
                     <td>
-                      <span className={`status-indicator ${
-                        item.expiration_risk === 'High' ? 'status-low' :
-                        item.expiration_risk === 'Medium' ? 'status-high' : 'status-normal'
-                      }`}>
-                        {item.expiration_risk}
-                      </span>
+                      <select
+                        value={item.expiration_risk}
+                        onChange={(e) => handleSave(item, 'expiration_risk', e.target.value)}
+                        className="border-none bg-transparent cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
+                      >
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                      </select>
                     </td>
                   </tr>
                 );
@@ -232,6 +358,120 @@ const Inventory = () => {
       {filteredItems.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           No items found matching your search criteria.
+        </div>
+      )}
+
+      {/* Add New Item Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Add New Inventory Item</h3>
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                <input
+                  type="text"
+                  value={newItem.item_name}
+                  onChange={(e) => setNewItem({...newItem, item_name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter item name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <input
+                  type="text"
+                  value={newItem.category}
+                  onChange={(e) => setNewItem({...newItem, category: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter category"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Stock</label>
+                  <input
+                    type="number"
+                    value={newItem.current_stock}
+                    onChange={(e) => setNewItem({...newItem, current_stock: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Stock</label>
+                  <input
+                    type="number"
+                    value={newItem.min_stock_level}
+                    onChange={(e) => setNewItem({...newItem, min_stock_level: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Stock</label>
+                  <input
+                    type="number"
+                    value={newItem.max_stock_level}
+                    onChange={(e) => setNewItem({...newItem, max_stock_level: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cost per Unit ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newItem.cost_per_unit}
+                  onChange={(e) => setNewItem({...newItem, cost_per_unit: parseFloat(e.target.value) || 0})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                <input
+                  type="text"
+                  value={newItem.supplier}
+                  onChange={(e) => setNewItem({...newItem, supplier: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter supplier name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Expiration Risk</label>
+                <select
+                  value={newItem.expiration_risk}
+                  onChange={(e) => setNewItem({...newItem, expiration_risk: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowAddForm(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddNew}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                Add Item
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

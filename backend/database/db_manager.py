@@ -139,13 +139,19 @@ class DatabaseManager:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', item)
 
-        usage_data = pd.read_csv('../data/inventory_usage.csv')
-        for _, row in usage_data.iterrows():
-            cursor.execute('''
-                INSERT INTO usage_history (item_name, quantity_used, usage_date, cost)
-                VALUES (?, ?, ?, ?)
-            ''', (row['item_name'], row['quantity_used'], row['date'],
-                  row['quantity_used'] * row['cost_per_unit']))
+        try:
+            import os
+            data_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'inventory_usage.csv')
+            if os.path.exists(data_path):
+                usage_data = pd.read_csv(data_path)
+                for _, row in usage_data.iterrows():
+                    cursor.execute('''
+                        INSERT INTO usage_history (item_name, quantity_used, usage_date, cost)
+                        VALUES (?, ?, ?, ?)
+                    ''', (row['item_name'], row['quantity_used'], row['date'],
+                          row['quantity_used'] * row['cost_per_unit']))
+        except Exception as e:
+            print(f"Warning: Could not load initial usage data: {e}")
 
         conn.commit()
 
@@ -154,14 +160,14 @@ class DatabaseManager:
 
         query = '''
             SELECT
-                item_name,
-                category,
-                current_stock,
-                min_stock_level,
-                max_stock_level,
-                cost_per_unit,
-                supplier,
-                expiration_risk,
+                i.item_name,
+                i.category,
+                i.current_stock,
+                i.min_stock_level,
+                i.max_stock_level,
+                i.cost_per_unit,
+                i.supplier,
+                i.expiration_risk,
                 COALESCE(avg_usage.daily_usage, 0) as usage_rate
             FROM inventory i
             LEFT JOIN (

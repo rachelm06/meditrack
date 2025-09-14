@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 const Predictions = () => {
@@ -23,13 +23,13 @@ const Predictions = () => {
 
   // Sample prediction data
   const samplePredictionData = [
-    { date: '2024-01-01', predicted: 120, actual: 115, confidence_lower: 100, confidence_upper: 140 },
-    { date: '2024-01-08', predicted: 135, actual: 130, confidence_lower: 115, confidence_upper: 155 },
-    { date: '2024-01-15', predicted: 145, actual: null, confidence_lower: 125, confidence_upper: 165 },
-    { date: '2024-01-22', predicted: 160, actual: null, confidence_lower: 140, confidence_upper: 180 },
-    { date: '2024-01-29', predicted: 155, actual: null, confidence_lower: 135, confidence_upper: 175 },
-    { date: '2024-02-05', predicted: 170, actual: null, confidence_lower: 150, confidence_upper: 190 },
-    { date: '2024-02-12', predicted: 165, actual: null, confidence_lower: 145, confidence_upper: 185 },
+    { date: '2024-01-01', predicted: 120, actual: 115 },
+    { date: '2024-01-08', predicted: 135, actual: 130 },
+    { date: '2024-01-15', predicted: 145, actual: null },
+    { date: '2024-01-22', predicted: 160, actual: null },
+    { date: '2024-01-29', predicted: 155, actual: null },
+    { date: '2024-02-05', predicted: 170, actual: null },
+    { date: '2024-02-12', predicted: 165, actual: null },
   ];
 
   const budgetImpactData = [
@@ -77,7 +77,6 @@ const Predictions = () => {
         ...prev,
         [selectedItem]: {
           predicted_demand: 165,
-          confidence_interval: [145, 185],
           trend: 'increasing',
           seasonal_factors: ['winter_surge', 'flu_season'],
           chartData: samplePredictionData
@@ -165,15 +164,15 @@ const Predictions = () => {
             </div>
           </div>
           <div className="metric-card">
-            <div className="metric-value text-green-600">
-              {currentPrediction.confidence_interval ?
-                `${currentPrediction.confidence_interval[0]}-${currentPrediction.confidence_interval[1]}` :
-                '145-185'
+            <div className="metric-value text-purple-600">
+              {currentPrediction.seasonal_factors ?
+                currentPrediction.seasonal_factors.join(', ') :
+                'winter_surge, flu_season'
               }
             </div>
-            <div className="metric-label">Confidence Range</div>
+            <div className="metric-label">Seasonal Factors</div>
             <div className="text-sm text-gray-500 mt-1">
-              95% confidence interval
+              Affecting demand patterns
             </div>
           </div>
           <div className="metric-card">
@@ -219,22 +218,6 @@ const Predictions = () => {
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   name="Predicted Demand"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="confidence_upper"
-                  stroke="#94A3B8"
-                  strokeWidth={1}
-                  dot={false}
-                  name="Upper Confidence"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="confidence_lower"
-                  stroke="#94A3B8"
-                  strokeWidth={1}
-                  dot={false}
-                  name="Lower Confidence"
                 />
               </LineChart>
             </ResponsiveContainer>

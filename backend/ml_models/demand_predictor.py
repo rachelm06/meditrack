@@ -18,9 +18,19 @@ class DemandPredictor:
         os.makedirs(self.model_path, exist_ok=True)
 
     def load_data(self):
-        admissions_df = pd.read_csv("../data/patient_admissions.csv")
-        usage_df = pd.read_csv("../data/inventory_usage.csv")
-        seasonal_df = pd.read_csv("../data/seasonal_trends.csv")
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            data_dir = os.path.join(base_dir, 'data')
+
+            admissions_df = pd.read_csv(os.path.join(data_dir, "patient_admissions.csv"))
+            usage_df = pd.read_csv(os.path.join(data_dir, "inventory_usage.csv"))
+            seasonal_df = pd.read_csv(os.path.join(data_dir, "seasonal_trends.csv"))
+        except Exception as e:
+            print(f"Warning: Could not load data files: {e}")
+            # Return empty DataFrames with expected columns as fallback
+            admissions_df = pd.DataFrame(columns=['date', 'admissions'])
+            usage_df = pd.DataFrame(columns=['date', 'item_name', 'quantity_used', 'cost_per_unit', 'expiration_risk'])
+            seasonal_df = pd.DataFrame(columns=['week', 'seasonal_factor', 'flu_trend', 'covid_trend'])
 
         admissions_df['date'] = pd.to_datetime(admissions_df['date'])
         usage_df['date'] = pd.to_datetime(usage_df['date'])
