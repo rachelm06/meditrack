@@ -146,8 +146,12 @@ const HospitalNetwork = () => {
       // Add markers for hospitals
       if (mapData && mapData.hospitals) {
         mapData.hospitals.forEach((hospital, index) => {
+          // Handle different API response structures
+          const lat = hospital.latitude || hospital.position?.lat;
+          const lng = hospital.longitude || hospital.position?.lng;
+
           const marker = new window.google.maps.Marker({
-            position: { lat: hospital.latitude, lng: hospital.longitude },
+            position: { lat: lat, lng: lng },
             map: map,
             title: hospital.name,
             icon: getHospitalMarkerIcon(hospital)

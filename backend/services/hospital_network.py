@@ -56,19 +56,20 @@ class HospitalNetworkService:
         self.max_hospitals = 20  # Maximum hospitals to consider in network
 
         # Initialize Google Maps client if valid API key provided
-        if google_maps_api_key and google_maps_api_key != "demo-mode-no-api-key":
+        if google_maps_api_key and google_maps_api_key != "demo-mode-no-api-key" and google_maps_api_key != "your-google-maps-api-key-here":
             try:
                 import googlemaps
                 self.gmaps = googlemaps.Client(key=google_maps_api_key)
+                print("✅ Google Maps API initialized successfully!")
                 self.demo_mode = False
             except Exception as e:
-                print(f"Google Maps initialization failed: {e}")
+                print(f"❌ Google Maps initialization failed: {e}")
                 self.gmaps = None
                 self.demo_mode = True
         else:
             self.gmaps = None
             self.demo_mode = True
-            print("Running in demo mode - Google Maps features will use simulated data")
+            print("🔧 Running in demo mode - Google Maps features will use simulated data")
 
     def discover_nearby_hospitals(self, latitude: float, longitude: float,
                                 radius_km: int = None) -> List[HospitalInfo]:
@@ -122,41 +123,71 @@ class HospitalNetworkService:
             return self._generate_demo_hospitals(latitude, longitude, radius_km)
 
     def _generate_demo_hospitals(self, center_lat: float, center_lng: float, radius_km: int) -> List[HospitalInfo]:
-        """Generate demo hospital data when Google Maps API is not available"""
+        """Generate realistic NYC-area hospital data when Google Maps API is not available"""
         import random
 
-        demo_hospitals = [
-            {"name": "General Hospital", "offset_lat": 0.01, "offset_lng": 0.01},
-            {"name": "Memorial Medical Center", "offset_lat": -0.015, "offset_lng": 0.02},
-            {"name": "City Hospital", "offset_lat": 0.02, "offset_lng": -0.01},
-            {"name": "Regional Medical Center", "offset_lat": -0.01, "offset_lng": -0.015},
-            {"name": "University Hospital", "offset_lat": 0.005, "offset_lng": 0.025},
-            {"name": "Community Hospital", "offset_lat": -0.02, "offset_lng": 0.005},
-            {"name": "St. Mary's Hospital", "offset_lat": 0.025, "offset_lng": 0.015},
-            {"name": "Emergency Medical Center", "offset_lat": -0.005, "offset_lng": -0.02}
+        # Realistic NYC area hospital data based on actual hospitals
+        nyc_hospitals = [
+            # Manhattan hospitals
+            {"name": "NewYork-Presbyterian Hospital", "lat": 40.7831, "lng": -73.9442, "address": "525 E 68th St, New York, NY 10065", "phone": "(212) 746-5454", "trauma": "Level I"},
+            {"name": "Mount Sinai Hospital", "lat": 40.7905, "lng": -73.9527, "address": "1 Gustave L. Levy Pl, New York, NY 10029", "phone": "(212) 241-6500", "trauma": "Level I"},
+            {"name": "NYU Langone Medical Center", "lat": 40.7392, "lng": -73.9732, "address": "550 1st Ave, New York, NY 10016", "phone": "(212) 263-7300", "trauma": "Level I"},
+            {"name": "Bellevue Hospital", "lat": 40.7388, "lng": -73.9754, "address": "462 1st Ave, New York, NY 10016", "phone": "(212) 562-4141", "trauma": "Level I"},
+            {"name": "Columbia Presbyterian Medical Center", "lat": 40.8424, "lng": -73.9441, "address": "622 W 168th St, New York, NY 10032", "phone": "(212) 305-2500", "trauma": "Level I"},
+            {"name": "Memorial Sloan Kettering Cancer Center", "lat": 40.7635, "lng": -73.9538, "address": "1275 York Ave, New York, NY 10065", "phone": "(212) 639-2000", "trauma": "Level III"},
+            {"name": "Hospital for Special Surgery", "lat": 40.7640, "lng": -73.9569, "address": "535 E 70th St, New York, NY 10021", "phone": "(212) 606-1000", "trauma": "Level III"},
+            {"name": "Mount Sinai Beth Israel", "lat": 40.7338, "lng": -73.9869, "address": "281 1st Ave, New York, NY 10003", "phone": "(212) 420-2000", "trauma": "Level II"},
+            {"name": "Mount Sinai West", "lat": 40.7698, "lng": -73.9879, "address": "1000 10th Ave, New York, NY 10019", "phone": "(212) 523-4000", "trauma": "Level II"},
+
+            # Brooklyn hospitals
+            {"name": "Brooklyn Methodist Hospital", "lat": 40.6736, "lng": -73.9865, "address": "506 6th St, Brooklyn, NY 11215", "phone": "(718) 780-3000", "trauma": "Level II"},
+            {"name": "Kings County Hospital Center", "lat": 40.6593, "lng": -73.9443, "address": "451 Clarkson Ave, Brooklyn, NY 11203", "phone": "(718) 245-3131", "trauma": "Level I"},
+            {"name": "Maimonides Medical Center", "lat": 40.6389, "lng": -73.9942, "address": "4802 10th Ave, Brooklyn, NY 11219", "phone": "(718) 283-6000", "trauma": "Level II"},
+            {"name": "NYC Health + Hospitals/Coney Island", "lat": 40.5795, "lng": -73.9707, "address": "2601 Ocean Pkwy, Brooklyn, NY 11235", "phone": "(718) 616-3000", "trauma": "Level II"},
+
+            # Queens hospitals
+            {"name": "Jamaica Hospital Medical Center", "lat": 40.6996, "lng": -73.8067, "address": "8900 Van Wyck Expy, Jamaica, NY 11418", "phone": "(718) 206-6000", "trauma": "Level II"},
+            {"name": "NewYork-Presbyterian Queens", "lat": 40.7437, "lng": -73.8273, "address": "56-45 Main St, Flushing, NY 11355", "phone": "(718) 670-1231", "trauma": "Level II"},
+            {"name": "Elmhurst Hospital Center", "lat": 40.7442, "lng": -73.8822, "address": "79-01 Broadway, Elmhurst, NY 11373", "phone": "(718) 334-4000", "trauma": "Level I"},
+            {"name": "St. Francis Hospital", "lat": 40.7892, "lng": -73.7269, "address": "100 Port Washington Blvd, Roslyn, NY 11576", "phone": "(516) 562-6000", "trauma": "Level III"},
+
+            # Bronx hospitals
+            {"name": "Bronx-Lebanon Hospital Center", "lat": 40.8393, "lng": -73.9167, "address": "1650 Selwyn Ave, Bronx, NY 10457", "phone": "(718) 590-1800", "trauma": "Level I"},
+            {"name": "Montefiore Medical Center", "lat": 40.8736, "lng": -73.8781, "address": "111 E 210th St, Bronx, NY 10467", "phone": "(718) 920-4321", "trauma": "Level I"},
+            {"name": "St. Barnabas Hospital", "lat": 40.8318, "lng": -73.8927, "address": "4422 3rd Ave, Bronx, NY 10457", "phone": "(718) 960-9000", "trauma": "Level II"},
+            {"name": "NYC Health + Hospitals/Lincoln", "lat": 40.8185, "lng": -73.9249, "address": "234 E 149th St, Bronx, NY 10451", "phone": "(718) 579-5000", "trauma": "Level II"},
+
+            # Staten Island hospitals
+            {"name": "Staten Island University Hospital", "lat": 40.6063, "lng": -74.1181, "address": "475 Seaview Ave, Staten Island, NY 10305", "phone": "(718) 226-9000", "trauma": "Level I"},
+            {"name": "Richmond University Medical Center", "lat": 40.6395, "lng": -74.1201, "address": "355 Bard Ave, Staten Island, NY 10310", "phone": "(718) 818-1234", "trauma": "Level II"},
+
+            # New Jersey hospitals (close to NYC)
+            {"name": "Jersey City Medical Center", "lat": 40.7178, "lng": -74.0431, "address": "355 Grand St, Jersey City, NJ 07302", "phone": "(201) 915-2000", "trauma": "Level II"},
+            {"name": "Hackensack University Medical Center", "lat": 40.8859, "lng": -74.0434, "address": "30 Prospect Ave, Hackensack, NJ 07601", "phone": "(551) 996-2000", "trauma": "Level I"},
         ]
 
         hospitals = []
-        for i, hospital_data in enumerate(demo_hospitals[:min(len(demo_hospitals), self.max_hospitals)]):
-            # Calculate position within radius
-            lat = center_lat + hospital_data["offset_lat"]
-            lng = center_lng + hospital_data["offset_lng"]
+        for i, hospital_data in enumerate(nyc_hospitals):
+            # Calculate distance from center point
+            distance = self._calculate_distance(center_lat, center_lng, hospital_data["lat"], hospital_data["lng"])
 
-            # Check if within radius
-            distance = self._calculate_distance(center_lat, center_lng, lat, lng)
-            if distance <= radius_km:
+            # Only include hospitals within the specified radius
+            if distance <= radius_km and len(hospitals) < self.max_hospitals:
                 hospital = HospitalInfo(
-                    id=f"demo_hospital_{i}",
+                    id=f"nyc_hospital_{i}",
                     name=hospital_data["name"],
-                    address=f"{random.randint(100, 9999)} Medical Dr, Healthcare City",
-                    latitude=lat,
-                    longitude=lng,
-                    phone=f"({random.randint(200, 999)}) {random.randint(100, 999)}-{random.randint(1000, 9999)}",
-                    capacity_rating=random.randint(3, 5),
-                    trauma_level=random.choice(["Level I", "Level II", "Level III"])
+                    address=hospital_data["address"],
+                    latitude=hospital_data["lat"],
+                    longitude=hospital_data["lng"],
+                    phone=hospital_data["phone"],
+                    capacity_rating=random.randint(4, 5),  # NYC hospitals tend to be high-capacity
+                    trauma_level=hospital_data["trauma"]
                 )
                 hospitals.append(hospital)
                 self.hospitals[hospital.id] = hospital
+
+        # Sort by distance from center
+        hospitals.sort(key=lambda h: self._calculate_distance(center_lat, center_lng, h.latitude, h.longitude))
 
         return hospitals
 

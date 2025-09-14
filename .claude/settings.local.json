@@ -15,7 +15,9 @@
       "WebSearch",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:github.com)",
-      "Bash(docker system prune:*)"
+      "Bash(docker system prune:*)",
+      "Bash(npm install:*)",
+      "Bash(kill:*)"
     ],
     "deny": [],
     "ask": []

@@ -7,6 +7,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 from ml_models.demand_predictor import DemandPredictor
 from api_clients.knot_client import KnotClient
 from api_clients.cerebras_client import CerebrasClient
