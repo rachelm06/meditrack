@@ -13,6 +13,7 @@ from api_clients.cerebras_client import CerebrasClient
 from database.db_manager import DatabaseManager
 from import_manager import ImportManager
 from api.hospital_network_api import router as network_router
+from ai_agents.supply_chain_judge import SupplyChainJudge
 
 app = FastAPI(title="Smart Healthcare Inventory Dashboard", version="1.0.0")
 
@@ -32,6 +33,7 @@ demand_predictor = DemandPredictor()
 knot_client = KnotClient()
 cerebras_client = CerebrasClient()
 import_manager = ImportManager()
+ai_judge = SupplyChainJudge()
 
 class PredictionRequest(BaseModel):
     item_name: str
@@ -53,6 +55,10 @@ class ReorderSuggestion(BaseModel):
     reorder_date: str
     estimated_cost: float
     priority: str
+
+class AIQuestionRequest(BaseModel):
+    question: str
+    context: dict = None
 
 @app.on_event("startup")
 async def startup_event():
@@ -319,6 +325,253 @@ async def get_import_templates():
             "inventory": inventory_template,
             "usage": usage_template
         }
+    }
+
+@app.get("/analytics/usage_trends")
+async def get_usage_trends(
+    start_date: str = None,
+    end_date: str = None,
+    aggregation: str = "day",
+    items: str = None
+):
+    """Get usage trends data with timeline filtering and aggregation"""
+    try:
+        # Parse parameters
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=30)).isoformat()
+        if not end_date:
+            end_date = datetime.now().isoformat()
+
+        item_filter = items.split(',') if items else None
+
+        # Get usage data with aggregation
+        usage_data = db_manager.get_usage_trends(
+            start_date=start_date,
+            end_date=end_date,
+            aggregation_level=aggregation,
+            item_filter=item_filter
+        )
+
+        return {
+            "data": usage_data,
+            "metadata": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "aggregation": aggregation,
+                "total_records": len(usage_data),
+                "items_included": item_filter or "all"
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analytics/demand_forecast")
+async def get_demand_forecast(
+    item_name: str,
+    start_date: str = None,
+    end_date: str = None,
+    confidence_intervals: bool = True
+):
+    """Get demand forecast data with confidence intervals"""
+    try:
+        if not start_date:
+            start_date = datetime.now().isoformat()
+        if not end_date:
+            # Default to 90 days ahead
+            end_date = (datetime.now() + timedelta(days=90)).isoformat()
+
+        # Calculate days between dates
+        start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        days_ahead = (end - start).days
+
+        # Get prediction
+        prediction = demand_predictor.predict_demand(item_name, days_ahead)
+
+        # Generate forecast timeline
+        forecast_data = []
+        current_date = start
+        daily_demand = prediction["demand"] / days_ahead if days_ahead > 0 else 0
+
+        for day in range(days_ahead):
+            date_str = (current_date + timedelta(days=day)).strftime('%Y-%m-%d')
+
+            # Add some realistic variance
+            import random
+            variance = daily_demand * 0.2 * random.uniform(-1, 1)
+
+            forecast_data.append({
+                "date": date_str,
+                "predicted_demand": max(0, daily_demand + variance),
+                "confidence_lower": max(0, daily_demand - abs(variance) * 1.5) if confidence_intervals else None,
+                "confidence_upper": daily_demand + abs(variance) * 1.5 if confidence_intervals else None
+            })
+
+        return {
+            "item_name": item_name,
+            "forecast": forecast_data,
+            "total_predicted_demand": prediction["demand"],
+            "confidence": prediction["confidence"],
+            "metadata": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "forecast_days": days_ahead,
+                "model_type": "hybrid_prophet_rf"
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ai_judge/emergency_alerts")
+async def get_emergency_alerts():
+    """Get urgent emergency purchase alerts for the front page"""
+    try:
+        inventory_data = db_manager.get_current_inventory()
+        emergency_alerts = []
+
+        for item in inventory_data:
+            # Get usage trends for the item
+            usage_trends = db_manager.get_usage_trends(
+                start_date=(datetime.now() - timedelta(days=30)).isoformat(),
+                end_date=datetime.now().isoformat(),
+                item_filter=[item['item_name']]
+            )
+
+            # Get prediction
+            try:
+                prediction = demand_predictor.predict_demand(item['item_name'], 30)
+            except:
+                prediction = {"demand": 0, "confidence": [0, 0]}
+
+            # Evaluate emergency status
+            evaluation = ai_judge.evaluate_emergency_purchase(
+                item_data=item,
+                usage_trends=usage_trends,
+                predictions=prediction,
+                external_context={"normal_conditions": True}
+            )
+
+            # Only include EMERGENCY and URGENT items
+            if evaluation["decision"] in ["EMERGENCY", "URGENT"]:
+                emergency_alerts.append({
+                    "item_name": item["item_name"],
+                    "decision": evaluation["decision"],
+                    "score": evaluation["score"],
+                    "confidence": evaluation["confidence"],
+                    "rationale": evaluation["rationale"],
+                    "action_required": evaluation["action_required"],
+                    "timeline": evaluation["timeline"]
+                })
+
+        # Sort by urgency (EMERGENCY first, then by score)
+        emergency_alerts.sort(key=lambda x: (x["decision"] != "EMERGENCY", -x["score"]))
+
+        return {
+            "emergency_alerts": emergency_alerts,
+            "alert_count": len(emergency_alerts),
+            "has_critical": any(alert["decision"] == "EMERGENCY" for alert in emergency_alerts),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/ai_judge/evaluate_item")
+async def evaluate_item_emergency(item_name: str):
+    """Evaluate a specific item for emergency purchase necessity"""
+    try:
+        # Get item data
+        inventory_data = db_manager.get_current_inventory()
+        item_data = next((item for item in inventory_data if item['item_name'].lower() == item_name.lower()), None)
+
+        if not item_data:
+            raise HTTPException(status_code=404, detail=f"Item '{item_name}' not found in inventory")
+
+        # Get usage trends
+        usage_trends = db_manager.get_usage_trends(
+            start_date=(datetime.now() - timedelta(days=30)).isoformat(),
+            end_date=datetime.now().isoformat(),
+            item_filter=[item_name]
+        )
+
+        # Get prediction
+        try:
+            prediction = demand_predictor.predict_demand(item_name, 30)
+        except:
+            prediction = {"demand": 0, "confidence": [0, 0]}
+
+        # Evaluate
+        evaluation = ai_judge.evaluate_emergency_purchase(
+            item_data=item_data,
+            usage_trends=usage_trends,
+            predictions=prediction,
+            external_context={"normal_conditions": True}
+        )
+
+        return evaluation
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/ai_judge/ask_question")
+async def ask_ai_judge(request: AIQuestionRequest):
+    """Ask the AI Judge a question about supply chain, predictions, or dashboard data"""
+    try:
+        # Gather context data
+        context_data = {}
+
+        # Add inventory data
+        try:
+            context_data['inventory'] = db_manager.get_current_inventory()
+        except:
+            context_data['inventory'] = []
+
+        # Add usage trends
+        try:
+            context_data['usage_trends'] = db_manager.get_usage_trends(
+                start_date=(datetime.now() - timedelta(days=30)).isoformat(),
+                end_date=datetime.now().isoformat()
+            )
+        except:
+            context_data['usage_trends'] = []
+
+        # Add budget data
+        try:
+            knot_data = await knot_client.get_purchase_data()
+            usage_analytics = db_manager.get_usage_analytics()
+            context_data['budget_impact'] = {
+                'total_monthly_spend': sum(purchase["amount"] for purchase in knot_data["purchases"]),
+                'waste_cost': sum(item["waste_cost"] for item in usage_analytics["waste_analysis"]),
+                'potential_savings': sum(item["potential_savings"] for item in usage_analytics["optimization_opportunities"])
+            }
+        except:
+            context_data['budget_impact'] = {}
+
+        # Add any user-provided context
+        if request.context:
+            context_data.update(request.context)
+
+        # Get response from AI Judge
+        response = ai_judge.ask_question(request.question, context_data)
+
+        return {
+            "question": request.question,
+            "response": response["response"],
+            "confidence": response["confidence"],
+            "response_type": response["response_type"],
+            "actionable": response.get("actionable", False),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ai_judge/constitution")
+async def get_ai_judge_constitution():
+    """Get the AI Judge's constitution and rules"""
+    return {
+        "constitution": ai_judge.constitution,
+        "version": "1.0",
+        "last_updated": "2025-01-01"
     }
 
 if __name__ == "__main__":

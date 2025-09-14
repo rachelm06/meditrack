@@ -373,6 +373,100 @@ class DatabaseManager:
         conn.commit()
         return cursor.rowcount > 0
 
+    def get_usage_trends(self, start_date=None, end_date=None, aggregation_level="day", item_filter=None):
+        """Get usage trends with time-based aggregation"""
+        conn = self.get_connection()
+
+        # Build aggregation SQL based on level
+        date_format = {
+            'hour': "strftime('%Y-%m-%d %H:00:00', usage_date) as period",
+            'day': "strftime('%Y-%m-%d', usage_date) as period",
+            'week': "strftime('%Y-W%W', usage_date) as period",
+            'month': "strftime('%Y-%m', usage_date) as period",
+            'year': "strftime('%Y', usage_date) as period"
+        }
+
+        date_select = date_format.get(aggregation_level, date_format['day'])
+
+        # Build the query
+        where_clauses = []
+        params = []
+
+        if start_date:
+            where_clauses.append("usage_date >= ?")
+            params.append(start_date)
+
+        if end_date:
+            where_clauses.append("usage_date <= ?")
+            params.append(end_date)
+
+        if item_filter:
+            placeholders = ','.join(['?' for _ in item_filter])
+            where_clauses.append(f"item_name IN ({placeholders})")
+            params.extend(item_filter)
+
+        where_clause = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+
+        query = f'''
+            SELECT
+                {date_select},
+                item_name,
+                SUM(quantity_used) as total_usage,
+                COUNT(*) as usage_events,
+                AVG(quantity_used) as avg_usage,
+                MIN(quantity_used) as min_usage,
+                MAX(quantity_used) as max_usage,
+                SUM(cost) as total_cost
+            FROM usage_history
+            {where_clause}
+            GROUP BY period, item_name
+            ORDER BY period, item_name
+        '''
+
+        df = pd.read_sql_query(query, conn, params=params)
+
+        # Convert to list of dictionaries and fill missing values
+        results = df.to_dict('records')
+
+        # Post-process to ensure consistent structure
+        for record in results:
+            record['date'] = record.pop('period', record.get('date'))
+            record['total_usage'] = record.get('total_usage', 0) or 0
+            record['total_cost'] = record.get('total_cost', 0) or 0
+
+        return results
+
+    def get_inventory_history(self, start_date=None, end_date=None, item_name=None):
+        """Get historical inventory levels over time"""
+        conn = self.get_connection()
+
+        # Since we don't have inventory snapshots, simulate based on current stock and usage
+        # In a real implementation, you'd have inventory_snapshots table
+        where_clauses = ["1=1"]  # Base condition
+        params = []
+
+        if item_name:
+            where_clauses.append("item_name = ?")
+            params.append(item_name)
+
+        where_clause = " AND ".join(where_clauses)
+
+        # Simulate inventory history by working backwards from current stock
+        query = f'''
+            SELECT
+                i.item_name,
+                i.current_stock,
+                i.cost_per_unit,
+                COALESCE(SUM(h.quantity_used), 0) as total_used
+            FROM inventory i
+            LEFT JOIN usage_history h ON i.item_name = h.item_name
+            WHERE {where_clause}
+            GROUP BY i.item_name, i.current_stock, i.cost_per_unit
+        '''
+
+        df = pd.read_sql_query(query, conn, params=params)
+        return df.to_dict('records')
+
     def close_connection(self):
         if self.connection:
             self.connection.close()

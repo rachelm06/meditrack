@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
+import EnhancedDashboard from './pages/EnhancedDashboard';
 import Inventory from './pages/Inventory';
 import Predictions from './pages/Predictions';
 import Import from './pages/Import';
@@ -64,7 +65,7 @@ function App() {
                 }`}
                 onClick={() => setActiveTab('predictions')}
               >
-                Predictions
+                Analytics and Predictions
               </Link>
               <Link
                 to="/import"

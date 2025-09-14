@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
+import AIAgent from '../components/AIAgent';
+import EmergencyAlerts from '../components/EmergencyAlerts';
 
 const Dashboard = () => {
   const [metrics, setMetrics] = useState(null);
   const [inventoryStatus, setInventoryStatus] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [aiAgentOpen, setAiAgentOpen] = useState(false);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -104,6 +108,44 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* AI Assistant Promotion Banner */}
+      {!aiAgentOpen && (
+        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center animate-pulse">
+                <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900">New: AI Supply Chain Assistant</h3>
+                <p className="text-sm text-blue-700">
+                  Get instant answers about emergency purchases, trends, and supply forecasts
+                </p>
+              </div>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setAiAgentOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
+              >
+                Try Now
+              </button>
+              <button
+                onClick={() => setAiAgentOpen(true)}
+                className="text-blue-600 hover:text-blue-800 text-sm underline"
+              >
+                See bottom-right corner →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Alerts - High Priority */}
+      <div className="mb-8">
+        <EmergencyAlerts />
+      </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -223,6 +265,12 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+
+      {/* AI Agent - Floating Assistant */}
+      <AIAgent
+        isOpen={aiAgentOpen}
+        onToggle={() => setAiAgentOpen(!aiAgentOpen)}
+      />
     </div>
   );
 };
