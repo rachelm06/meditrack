@@ -1,0 +1,6 @@
+item_name,category,current_stock,min_stock_level,max_stock_level,cost_per_unit,supplier,expiration_risk
+"Surgical Scissors",General Supplies,150,25,500,15.50,"MedEquip Ltd",Low
+"Digital Thermometers",General Supplies,75,15,200,28.99,"MedTech Inc",Low
+"Face Shields",PPE,1200,200,3000,3.25,"SafeGuard Medical",Low
+"Insulin Pens",Medication,450,50,1000,22.75,"DiabetesCare Supply",High
+"Pulse Oximeters",General Supplies,35,10,100,85.00,"VitalSigns Corp",Low

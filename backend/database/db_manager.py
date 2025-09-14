@@ -77,6 +77,37 @@ class DatabaseManager:
             )
         ''')
 
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS import_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                import_id TEXT NOT NULL UNIQUE,
+                import_type TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                status TEXT NOT NULL,
+                imported_records INTEGER DEFAULT 0,
+                failed_records INTEGER DEFAULT 0,
+                error_details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS prescriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                prescription_id TEXT NOT NULL,
+                patient_id TEXT NOT NULL,
+                item_name TEXT NOT NULL,
+                prescribed_quantity INTEGER NOT NULL,
+                prescribed_date DATE NOT NULL,
+                prescribing_physician TEXT,
+                dosage_instructions TEXT,
+                duration_days INTEGER,
+                status TEXT DEFAULT 'Active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         conn.commit()
         self._seed_initial_data()
 
@@ -108,7 +139,7 @@ class DatabaseManager:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', item)
 
-        usage_data = pd.read_csv('/app/data/inventory_usage.csv')
+        usage_data = pd.read_csv('../data/inventory_usage.csv')
         for _, row in usage_data.iterrows():
             cursor.execute('''
                 INSERT INTO usage_history (item_name, quantity_used, usage_date, cost)

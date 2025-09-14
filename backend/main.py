@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -11,6 +11,7 @@ from ml_models.demand_predictor import DemandPredictor
 from api_clients.knot_client import KnotClient
 from api_clients.cerebras_client import CerebrasClient
 from database.db_manager import DatabaseManager
+from import_manager import ImportManager
 
 app = FastAPI(title="Smart Healthcare Inventory Dashboard", version="1.0.0")
 
@@ -26,6 +27,7 @@ db_manager = DatabaseManager()
 demand_predictor = DemandPredictor()
 knot_client = KnotClient()
 cerebras_client = CerebrasClient()
+import_manager = ImportManager()
 
 class PredictionRequest(BaseModel):
     item_name: str
@@ -162,6 +164,128 @@ async def get_dashboard_metrics():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/import/inventory")
+async def import_inventory_data(file: UploadFile = File(...)):
+    """Import inventory data from CSV or Excel file"""
+    if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Only CSV and Excel files are supported"
+        )
+
+    try:
+        file_content = await file.read()
+        result = import_manager.import_inventory_data(file_content, file.filename)
+
+        if result.success:
+            return {
+                "success": True,
+                "message": result.message,
+                "import_id": result.import_id,
+                "imported_records": result.imported_records,
+                "failed_records": result.failed_records,
+                "errors": result.errors
+            }
+        else:
+            raise HTTPException(status_code=400, detail=result.message)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/import/usage")
+async def import_usage_data(file: UploadFile = File(...)):
+    """Import usage/prescription data from CSV or Excel file"""
+    if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Only CSV and Excel files are supported"
+        )
+
+    try:
+        file_content = await file.read()
+        result = import_manager.import_usage_data(file_content, file.filename)
+
+        if result.success:
+            return {
+                "success": True,
+                "message": result.message,
+                "import_id": result.import_id,
+                "imported_records": result.imported_records,
+                "failed_records": result.failed_records,
+                "errors": result.errors
+            }
+        else:
+            raise HTTPException(status_code=400, detail=result.message)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/import/history")
+async def get_import_history(limit: int = 50):
+    """Get import history records"""
+    try:
+        history = import_manager.get_import_history(limit)
+        return {"imports": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/import/status/{import_id}")
+async def get_import_status(import_id: str):
+    """Get status of specific import"""
+    try:
+        status = import_manager.get_import_status(import_id)
+        if status:
+            return status
+        else:
+            raise HTTPException(status_code=404, detail="Import not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/import/templates")
+async def get_import_templates():
+    """Get sample CSV templates for data import"""
+    inventory_template = {
+        "filename": "inventory_template.csv",
+        "headers": ["item_name", "category", "current_stock", "min_stock_level",
+                   "max_stock_level", "cost_per_unit", "supplier", "expiration_risk"],
+        "sample_data": [
+            {
+                "item_name": "N95 Masks",
+                "category": "PPE",
+                "current_stock": 500,
+                "min_stock_level": 100,
+                "max_stock_level": 1000,
+                "cost_per_unit": 2.50,
+                "supplier": "MedSupply Co",
+                "expiration_risk": "Low"
+            }
+        ]
+    }
+
+    usage_template = {
+        "filename": "usage_template.csv",
+        "headers": ["item_name", "quantity_used", "usage_date", "department",
+                   "patient_id", "prescription_id", "notes"],
+        "sample_data": [
+            {
+                "item_name": "N95 Masks",
+                "quantity_used": 50,
+                "usage_date": "2024-01-15",
+                "department": "Emergency",
+                "patient_id": "P001",
+                "prescription_id": "",
+                "notes": "Regular usage"
+            }
+        ]
+    }
+
+    return {
+        "templates": {
+            "inventory": inventory_template,
+            "usage": usage_template
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn

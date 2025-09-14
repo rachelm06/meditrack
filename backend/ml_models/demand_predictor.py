@@ -14,13 +14,13 @@ class DemandPredictor:
         self.prophet_model = None
         self.rf_model = None
         self.item_models = {}
-        self.model_path = "/app/models/"
+        self.model_path = "./models/"
         os.makedirs(self.model_path, exist_ok=True)
 
     def load_data(self):
-        admissions_df = pd.read_csv("/app/data/patient_admissions.csv")
-        usage_df = pd.read_csv("/app/data/inventory_usage.csv")
-        seasonal_df = pd.read_csv("/app/data/seasonal_trends.csv")
+        admissions_df = pd.read_csv("../data/patient_admissions.csv")
+        usage_df = pd.read_csv("../data/inventory_usage.csv")
+        seasonal_df = pd.read_csv("../data/seasonal_trends.csv")
 
         admissions_df['date'] = pd.to_datetime(admissions_df['date'])
         usage_df['date'] = pd.to_datetime(usage_df['date'])

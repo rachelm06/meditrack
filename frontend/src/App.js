@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import Predictions from './pages/Predictions';
+import Import from './pages/Import';
 import './App.css';
 
 function App() {
@@ -64,6 +65,17 @@ function App() {
               >
                 Predictions
               </Link>
+              <Link
+                to="/import"
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'import'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setActiveTab('import')}
+              >
+                Import Data
+              </Link>
             </div>
           </div>
         </nav>
@@ -74,6 +86,7 @@ function App() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/predictions" element={<Predictions />} />
+            <Route path="/import" element={<Import />} />
           </Routes>
         </main>
       </div>

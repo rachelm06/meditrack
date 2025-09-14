@@ -1,0 +1,6 @@
+item_name,quantity_used,usage_date,department,patient_id,prescription_id,notes
+"N95 Masks",25,2024-01-15,Emergency,P001,"","Regular shift usage"
+"Surgical Gloves",150,2024-01-15,Surgery,P002,"","Multiple surgical procedures"
+"Acetaminophen",30,2024-01-15,General Medicine,P003,RX001,"Pain management"
+"Ibuprofen",20,2024-01-15,Orthopedics,P004,RX002,"Post-surgical anti-inflammatory"
+"Syringes",45,2024-01-15,Vaccination Clinic,P005,"","COVID-19 vaccinations"
