@@ -1,0 +1,4 @@
+item_name,category,number_items,cost_per_unit,supplier,expiration_risk
+N95 Masks,PPE,100,2.50,MedSupply Co,Low
+Test Bandages,Medical Supplies,50,2.50,TestSupplies Inc,Low
+New Item,General Supplies,200,5.00,NewSupplier,Medium

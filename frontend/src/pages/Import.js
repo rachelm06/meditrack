@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import {
   CloudArrowUpIcon,
   DocumentTextIcon,
@@ -12,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Import = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('inventory');
   const [importHistory, setImportHistory] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -90,6 +92,9 @@ const Import = () => {
 
       // Refresh import history
       fetchImportHistory();
+
+      // Notify other components that inventory may have been updated
+      window.dispatchEvent(new Event('inventoryUpdated'));
     } catch (error) {
       setUploadResult({
         success: false,
@@ -394,6 +399,14 @@ const Import = () => {
                     )}
                     {uploadResult.import_id && (
                       <p>Import ID: {uploadResult.import_id}</p>
+                    )}
+                    {activeTab === 'inventory' && (
+                      <button
+                        onClick={() => navigate('/inventory')}
+                        className="mt-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      >
+                        View Updated Inventory →
+                      </button>
                     )}
                   </div>
                 )}

@@ -160,6 +160,7 @@ class DatabaseManager:
 
         query = '''
             SELECT
+                i.id,
                 i.item_name,
                 i.category,
                 i.current_stock,
@@ -178,6 +179,7 @@ class DatabaseManager:
                 WHERE usage_date >= date('now', '-30 days')
                 GROUP BY item_name
             ) avg_usage ON i.item_name = avg_usage.item_name
+            ORDER BY i.id
         '''
 
         df = pd.read_sql_query(query, conn)
@@ -309,6 +311,67 @@ class DatabaseManager:
 
         df = pd.read_sql_query(query, conn, params=[threshold_days])
         return df.to_dict('records')
+
+    def update_inventory_item(self, item_name, updates):
+        """Update specific fields of an inventory item"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Build the SET clause dynamically
+        set_clauses = []
+        values = []
+
+        for field, value in updates.items():
+            if field in ['current_stock', 'min_stock_level', 'max_stock_level', 'cost_per_unit',
+                        'item_name', 'category', 'supplier', 'expiration_risk']:
+                set_clauses.append(f"{field} = ?")
+                values.append(value)
+
+        if not set_clauses:
+            return False
+
+        # Always update the timestamp
+        set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+        values.append(item_name)  # for WHERE clause
+
+        query = f'''
+            UPDATE inventory
+            SET {', '.join(set_clauses)}
+            WHERE item_name = ?
+        '''
+
+        cursor.execute(query, values)
+        conn.commit()
+        return cursor.rowcount > 0
+
+    def add_inventory_item(self, item_data):
+        """Add a new inventory item"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        # Check if item already exists
+        cursor.execute("SELECT COUNT(*) FROM inventory WHERE item_name = ?", (item_data['item_name'],))
+        if cursor.fetchone()[0] > 0:
+            raise ValueError(f"Item '{item_data['item_name']}' already exists")
+
+        cursor.execute('''
+            INSERT INTO inventory (
+                item_name, category, current_stock, min_stock_level,
+                max_stock_level, cost_per_unit, supplier, expiration_risk
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            item_data['item_name'],
+            item_data['category'],
+            item_data['current_stock'],
+            item_data['min_stock_level'],
+            item_data['max_stock_level'],
+            item_data['cost_per_unit'],
+            item_data['supplier'],
+            item_data['expiration_risk']
+        ))
+
+        conn.commit()
+        return cursor.rowcount > 0
 
     def close_connection(self):
         if self.connection:

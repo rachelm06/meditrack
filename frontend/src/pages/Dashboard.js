@@ -39,6 +39,16 @@ const Dashboard = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  // Listen for inventory updates to refresh dashboard metrics
+  useEffect(() => {
+    const handleInventoryUpdate = () => {
+      fetchDashboardData();
+    };
+
+    window.addEventListener('inventoryUpdated', handleInventoryUpdate);
+    return () => window.removeEventListener('inventoryUpdated', handleInventoryUpdate);
+  }, [fetchDashboardData]);
+
   // Sample data for demonstration
   const sampleUsageData = [
     { month: 'Jan', supplies: 120, medications: 80, equipment: 30 },
@@ -68,8 +78,19 @@ const Dashboard = () => {
   return (
     <div className="px-4 py-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Healthcare Inventory Dashboard</h1>
-        <p className="mt-2 text-gray-600">Monitor your inventory levels, usage patterns, and predictions</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Healthcare Inventory Dashboard</h1>
+            <p className="mt-2 text-gray-600">Monitor your inventory levels, usage patterns, and predictions</p>
+          </div>
+          <button
+            onClick={fetchDashboardData}
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Refreshing...' : 'Refresh Data'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -87,19 +108,27 @@ const Dashboard = () => {
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="metric-card">
-          <div className="metric-value text-blue-600">247</div>
+          <div className="metric-value text-blue-600">
+            {metrics?.total_items || '--'}
+          </div>
           <div className="metric-label">Total Items</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value text-red-600">23</div>
+          <div className="metric-value text-red-600">
+            {metrics?.low_stock_items || '--'}
+          </div>
           <div className="metric-label">Low Stock</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value text-yellow-600">12</div>
-          <div className="metric-label">Expiring Soon</div>
+          <div className="metric-value text-yellow-600">
+            {metrics?.critical_alerts || '--'}
+          </div>
+          <div className="metric-label">Critical Alerts</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value text-green-600">$45,670</div>
+          <div className="metric-value text-green-600">
+            ${metrics?.total_inventory_value ? metrics.total_inventory_value.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '--'}
+          </div>
           <div className="metric-label">Total Value</div>
         </div>
       </div>
@@ -158,29 +187,40 @@ const Dashboard = () => {
           <h3 className="text-lg font-semibold text-gray-900">Low Stock Alerts</h3>
         </div>
         <div className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
-              <div>
-                <h4 className="font-medium text-red-900">Surgical Masks</h4>
-                <p className="text-sm text-red-700">Current stock: 45 units (Min: 100)</p>
-              </div>
-              <span className="status-indicator status-low">Critical</span>
+          {inventoryStatus?.predicted_shortages?.length > 0 ? (
+            <div className="space-y-4">
+              {inventoryStatus.predicted_shortages.map((item, index) => (
+                <div key={index} className={`flex items-center justify-between p-4 rounded-lg border ${
+                  item.days_until_depletion < 7
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <div>
+                    <h4 className={`font-medium ${
+                      item.days_until_depletion < 7 ? 'text-red-900' : 'text-yellow-900'
+                    }`}>
+                      {item.item_name}
+                    </h4>
+                    <p className={`text-sm ${
+                      item.days_until_depletion < 7 ? 'text-red-700' : 'text-yellow-700'
+                    }`}>
+                      Current stock: {item.current_stock} units - {item.days_until_depletion} days left
+                    </p>
+                  </div>
+                  <span className={`status-indicator ${
+                    item.days_until_depletion < 7 ? 'status-low' : 'status-high'
+                  }`}>
+                    {item.days_until_depletion < 7 ? 'Critical' : 'Low'}
+                  </span>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-              <div>
-                <h4 className="font-medium text-yellow-900">Disposable Gloves</h4>
-                <p className="text-sm text-yellow-700">Current stock: 180 units (Min: 150)</p>
-              </div>
-              <span className="status-indicator status-high">Low</span>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-green-600 text-4xl mb-2">✓</div>
+              <p>No low stock alerts - all items are well stocked!</p>
             </div>
-            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
-              <div>
-                <h4 className="font-medium text-red-900">Hand Sanitizer</h4>
-                <p className="text-sm text-red-700">Current stock: 12 bottles (Min: 50)</p>
-              </div>
-              <span className="status-indicator status-low">Critical</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

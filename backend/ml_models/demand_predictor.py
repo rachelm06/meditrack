@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 from prophet import Prophet
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, TimeSeriesSplit
+from sklearn.metrics import mean_squared_error, mean_absolute_error, make_scorer
 import pickle
 import os
 from datetime import datetime, timedelta
@@ -60,6 +61,102 @@ class DemandPredictor:
 
         return merged_df
 
+    def optimize_prophet_hyperparameters(self, prophet_data, item_name):
+        """Optimize Prophet hyperparameters using cross-validation"""
+
+        # Parameter combinations to test
+        param_combinations = [
+            {'changepoint_prior_scale': 0.001, 'seasonality_prior_scale': 0.01},
+            {'changepoint_prior_scale': 0.01, 'seasonality_prior_scale': 0.1},
+            {'changepoint_prior_scale': 0.05, 'seasonality_prior_scale': 1.0},
+            {'changepoint_prior_scale': 0.1, 'seasonality_prior_scale': 10.0},
+            {'changepoint_prior_scale': 0.5, 'seasonality_prior_scale': 10.0}
+        ]
+
+        best_model = None
+        best_mape = float('inf')
+        best_params = None
+
+        print(f"Optimizing Prophet parameters for {item_name}...")
+
+        for params in param_combinations:
+            try:
+                model = Prophet(
+                    growth='logistic',
+                    seasonality_mode='multiplicative',
+                    yearly_seasonality=True,
+                    weekly_seasonality=True,
+                    daily_seasonality=False,
+                    changepoint_prior_scale=params['changepoint_prior_scale'],
+                    seasonality_prior_scale=params['seasonality_prior_scale']
+                )
+
+                # Add regressors if they exist in data
+                for regressor in ['admissions', 'flu_cases', 'covid_cases']:
+                    if regressor in prophet_data.columns:
+                        model.add_regressor(regressor)
+
+                model.fit(prophet_data)
+
+                # Simple holdout validation (use last 20% of data for validation)
+                split_point = int(len(prophet_data) * 0.8)
+                train_data = prophet_data[:split_point]
+                val_data = prophet_data[split_point:]
+
+                if len(val_data) > 0:
+                    model_temp = Prophet(
+                        growth='logistic',
+                        seasonality_mode='multiplicative',
+                        yearly_seasonality=True,
+                        weekly_seasonality=True,
+                        daily_seasonality=False,
+                        changepoint_prior_scale=params['changepoint_prior_scale'],
+                        seasonality_prior_scale=params['seasonality_prior_scale']
+                    )
+
+                    for regressor in ['admissions', 'flu_cases', 'covid_cases']:
+                        if regressor in train_data.columns:
+                            model_temp.add_regressor(regressor)
+
+                    model_temp.fit(train_data)
+
+                    # Make predictions on validation set
+                    forecast = model_temp.predict(val_data[['ds'] + [col for col in val_data.columns if col in ['admissions', 'flu_cases', 'covid_cases']]])
+
+                    # Calculate MAPE
+                    actual = val_data['y'].values
+                    predicted = forecast['yhat'].values
+                    mape = np.mean(np.abs((actual - predicted) / actual)) * 100
+
+                    if mape < best_mape:
+                        best_mape = mape
+                        best_model = model
+                        best_params = params
+
+            except Exception as e:
+                print(f"Error with parameters {params}: {e}")
+                continue
+
+        if best_model is None:
+            # Fallback to default parameters
+            print(f"Using default Prophet parameters for {item_name}")
+            best_model = Prophet(
+                growth='logistic',
+                seasonality_mode='multiplicative',
+                yearly_seasonality=True,
+                weekly_seasonality=True,
+                daily_seasonality=False,
+                changepoint_prior_scale=0.05
+            )
+            for regressor in ['admissions', 'flu_cases', 'covid_cases']:
+                if regressor in prophet_data.columns:
+                    best_model.add_regressor(regressor)
+            best_model.fit(prophet_data)
+        else:
+            print(f"Best Prophet parameters for {item_name}: {best_params}, MAPE: {best_mape:.2f}%")
+
+        return best_model
+
     def train_prophet_model(self, data, item_name):
         item_data = data[data['item_name'] == item_name].copy()
 
@@ -74,44 +171,100 @@ class DemandPredictor:
         prophet_data['cap'] = prophet_data['y'].max() * 2
         prophet_data['floor'] = 0
 
-        model = Prophet(
-            growth='logistic',
-            seasonality_mode='multiplicative',
-            yearly_seasonality=True,
-            weekly_seasonality=True,
-            daily_seasonality=False,
-            changepoint_prior_scale=0.05
-        )
+        # Add regressors if available in the data
+        available_regressors = ['admissions', 'flu_cases', 'covid_cases']
+        for regressor in available_regressors:
+            if regressor in item_data.columns:
+                prophet_data[regressor] = item_data[regressor].values
 
-        model.add_regressor('admissions')
-        model.add_regressor('flu_cases')
-        model.add_regressor('covid_cases')
+        # Use hyperparameter optimization if enough data
+        if len(prophet_data) >= 50:
+            model = self.optimize_prophet_hyperparameters(prophet_data, item_name)
+        else:
+            print(f"Insufficient data for hyperparameter tuning for {item_name}, using default parameters")
+            model = Prophet(
+                growth='logistic',
+                seasonality_mode='multiplicative',
+                yearly_seasonality=True,
+                weekly_seasonality=True,
+                daily_seasonality=False,
+                changepoint_prior_scale=0.05
+            )
 
-        prophet_data = prophet_data.merge(
-            item_data[['date', 'admissions', 'flu_cases', 'covid_cases']],
-            left_on='ds', right_on='date', how='left'
-        )
+            for regressor in available_regressors:
+                if regressor in prophet_data.columns:
+                    model.add_regressor(regressor)
 
-        model.fit(prophet_data)
+            model.fit(prophet_data)
+
         return model
+
+    def optimize_rf_hyperparameters(self, X, y):
+        """Optimize Random Forest hyperparameters using RandomizedSearchCV"""
+
+        # Define parameter distributions for random search
+        param_distributions = {
+            'n_estimators': [50, 100, 200, 300],
+            'max_depth': [5, 10, 15, 20, None],
+            'min_samples_split': [2, 5, 10, 20],
+            'min_samples_leaf': [1, 2, 4, 8],
+            'max_features': ['sqrt', 'log2', None],
+            'bootstrap': [True, False]
+        }
+
+        # Use TimeSeriesSplit for time-based data
+        tscv = TimeSeriesSplit(n_splits=3)
+
+        # Create the base model
+        rf = RandomForestRegressor(random_state=42)
+
+        # Perform randomized search
+        rf_random = RandomizedSearchCV(
+            estimator=rf,
+            param_distributions=param_distributions,
+            n_iter=50,  # Number of parameter combinations to try
+            cv=tscv,
+            scoring='neg_mean_squared_error',
+            random_state=42,
+            n_jobs=-1,  # Use all available cores
+            verbose=0
+        )
+
+        # Fit the randomized search
+        rf_random.fit(X, y)
+
+        print(f"Best RF parameters: {rf_random.best_params_}")
+        print(f"Best RF score: {-rf_random.best_score_:.4f}")
+
+        return rf_random.best_estimator_
 
     def train_rf_model(self, data):
         features = ['admissions', 'flu_cases', 'covid_cases', 'surgery_count',
                    'emergency_count', 'seasonal_factor', 'flu_trend', 'covid_trend',
                    'day_of_week', 'month', 'is_weekend', 'demand_factor']
 
-        X = data[features].fillna(data[features].mean())
+        # Filter features that actually exist in the data
+        available_features = [f for f in features if f in data.columns]
+        if not available_features:
+            available_features = ['day_of_week', 'month', 'is_weekend']  # Basic fallback features
+
+        X = data[available_features].fillna(data[available_features].mean())
         y = data['quantity_used']
 
-        model = RandomForestRegressor(
-            n_estimators=100,
-            max_depth=10,
-            random_state=42,
-            min_samples_split=5,
-            min_samples_leaf=2
-        )
+        if len(X) < 50:  # Not enough data for hyperparameter tuning
+            print("Insufficient data for hyperparameter tuning, using default parameters")
+            model = RandomForestRegressor(
+                n_estimators=100,
+                max_depth=10,
+                random_state=42,
+                min_samples_split=5,
+                min_samples_leaf=2
+            )
+            model.fit(X, y)
+        else:
+            print("Optimizing Random Forest hyperparameters...")
+            model = self.optimize_rf_hyperparameters(X, y)
 
-        model.fit(X, y)
         return model
 
     def load_or_train_model(self):

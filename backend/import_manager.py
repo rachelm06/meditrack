@@ -21,14 +21,14 @@ class ImportResult(BaseModel):
 class InventoryImportRecord(BaseModel):
     item_name: str
     category: str
-    current_stock: int
+    number_items: int  # Changed from current_stock to number_items for additive imports
     min_stock_level: Optional[int] = 50
     max_stock_level: Optional[int] = 1000
     cost_per_unit: float
     supplier: Optional[str] = None
     expiration_risk: Optional[str] = "Low"
 
-    @validator('current_stock', 'min_stock_level', 'max_stock_level')
+    @validator('number_items', 'min_stock_level', 'max_stock_level')
     def validate_positive_integers(cls, v):
         if v is not None and v < 0:
             raise ValueError('Stock levels must be non-negative')
@@ -196,7 +196,13 @@ class ImportManager:
                     record_dict = {}
                     record_dict['item_name'] = str(row.get('item_name', '')) if pd.notna(row.get('item_name')) else ''
                     record_dict['category'] = str(row.get('category', 'Unknown')) if pd.notna(row.get('category')) else 'Unknown'
-                    record_dict['current_stock'] = int(float(row.get('current_stock', 0))) if pd.notna(row.get('current_stock')) else 0
+                    # Support both number_items (new) and current_stock (legacy) column names
+                    if 'number_items' in row and pd.notna(row.get('number_items')):
+                        record_dict['number_items'] = int(float(row.get('number_items', 0)))
+                    elif 'current_stock' in row and pd.notna(row.get('current_stock')):
+                        record_dict['number_items'] = int(float(row.get('current_stock', 0)))
+                    else:
+                        record_dict['number_items'] = 0
                     record_dict['min_stock_level'] = int(float(row.get('min_stock_level', 50))) if pd.notna(row.get('min_stock_level')) else 50
                     record_dict['max_stock_level'] = int(float(row.get('max_stock_level', 1000))) if pd.notna(row.get('max_stock_level')) else 1000
                     record_dict['cost_per_unit'] = float(row.get('cost_per_unit', 0)) if pd.notna(row.get('cost_per_unit')) else 0.0
@@ -211,24 +217,24 @@ class ImportManager:
                     existing = cursor.fetchone()
 
                     if existing:
-                        # Update existing item
+                        # Update existing item - ADD to current stock (additive)
                         cursor.execute('''
                             UPDATE inventory
-                            SET category = ?, current_stock = ?, min_stock_level = ?,
+                            SET category = ?, current_stock = current_stock + ?, min_stock_level = ?,
                                 max_stock_level = ?, cost_per_unit = ?, supplier = ?,
                                 expiration_risk = ?, updated_at = CURRENT_TIMESTAMP
                             WHERE item_name = ?
-                        ''', (record.category, record.current_stock, record.min_stock_level,
+                        ''', (record.category, record.number_items, record.min_stock_level,
                               record.max_stock_level, record.cost_per_unit, record.supplier,
                               record.expiration_risk, record.item_name))
                     else:
-                        # Insert new item
+                        # Insert new item - initialize with number_items
                         cursor.execute('''
                             INSERT INTO inventory
                             (item_name, category, current_stock, min_stock_level,
                              max_stock_level, cost_per_unit, supplier, expiration_risk)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (record.item_name, record.category, record.current_stock,
+                        ''', (record.item_name, record.category, record.number_items,
                               record.min_stock_level, record.max_stock_level, record.cost_per_unit,
                               record.supplier, record.expiration_risk))
 

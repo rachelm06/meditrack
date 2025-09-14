@@ -1,0 +1,4 @@
+item_name,category,current_stock,min_stock_level,max_stock_level,cost_per_unit,supplier,expiration_risk
+Test Medicine A,Medication,500,100,1000,15.99,TestPharmaCorp,High
+Test Bandages,Medical Supplies,2000,200,5000,2.50,TestSupplies Inc,Low
+Updated N95 Masks,PPE,1500,200,3000,3.00,NewSupplier,Medium

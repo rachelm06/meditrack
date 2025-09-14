@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 const Predictions = () => {
@@ -7,19 +7,11 @@ const Predictions = () => {
   const [daysAhead, setDaysAhead] = useState(30);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [availableItems, setAvailableItems] = useState([]);
+  const [budgetImpactData, setBudgetImpactData] = useState([]);
+  const [budgetLoading, setBudgetLoading] = useState(true);
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-
-  const availableItems = [
-    'Surgical Masks',
-    'Disposable Gloves',
-    'Hand Sanitizer',
-    'Antibiotics - Amoxicillin',
-    'Digital Thermometer',
-    'Syringes',
-    'Bandages',
-    'Gauze Pads'
-  ];
 
   // Sample prediction data
   const samplePredictionData = [
@@ -32,12 +24,44 @@ const Predictions = () => {
     { date: '2024-02-12', predicted: 165, actual: null },
   ];
 
-  const budgetImpactData = [
-    { item: 'Surgical Masks', current_cost: 225, predicted_cost: 400, savings_opportunity: 50 },
-    { item: 'Disposable Gloves', current_cost: 450, predicted_cost: 520, savings_opportunity: 30 },
-    { item: 'Hand Sanitizer', current_cost: 180, predicted_cost: 280, savings_opportunity: 75 },
-    { item: 'Antibiotics', current_cost: 940, predicted_cost: 1200, savings_opportunity: 120 },
-  ];
+  const fetchInitialData = useCallback(async () => {
+    try {
+      setBudgetLoading(true);
+
+      // Fetch available inventory items
+      const inventoryResponse = await fetch(`${API_BASE_URL}/inventory`);
+      if (inventoryResponse.ok) {
+        const inventoryData = await inventoryResponse.json();
+        const items = inventoryData.inventory.map(item => item.item_name);
+        setAvailableItems(items);
+      }
+
+      // Fetch budget impact data
+      const budgetResponse = await fetch(`${API_BASE_URL}/budget_impact`);
+      if (budgetResponse.ok) {
+        const budgetData = await budgetResponse.json();
+
+        // Transform the data to match our chart format
+        const chartData = budgetData.waste_analysis.map(item => ({
+          item: item.item_name,
+          current_cost: Math.round(budgetData.total_monthly_spend / budgetData.waste_analysis.length),
+          predicted_cost: Math.round(item.waste_cost),
+          savings_opportunity: Math.round(item.waste_cost * 0.3) // Potential 30% savings
+        }));
+
+        setBudgetImpactData(chartData);
+      }
+
+    } catch (err) {
+      console.error('Error fetching initial data:', err);
+    } finally {
+      setBudgetLoading(false);
+    }
+  }, [API_BASE_URL]);
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   const handlePredictDemand = async () => {
     if (!selectedItem) return;
@@ -92,8 +116,19 @@ const Predictions = () => {
   return (
     <div className="px-4 py-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Demand Predictions & Analytics</h1>
-        <p className="mt-2 text-gray-600">Forecast inventory demand using machine learning models</p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Demand Predictions & Analytics</h1>
+            <p className="mt-2 text-gray-600">Forecast inventory demand using machine learning models</p>
+          </div>
+          <button
+            onClick={fetchInitialData}
+            disabled={budgetLoading}
+            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {budgetLoading ? 'Refreshing...' : 'Refresh Data'}
+          </button>
+        </div>
       </div>
 
       {/* Prediction Controls */}
@@ -229,22 +264,36 @@ const Predictions = () => {
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">Budget Impact Analysis</h3>
+          <p className="text-sm text-gray-500 mt-1">Real-time waste analysis and savings opportunities</p>
         </div>
         <div className="p-6">
-          <div style={{ width: '100%', height: 300 }}>
-            <ResponsiveContainer>
-              <BarChart data={budgetImpactData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="item" />
-                <YAxis />
-                <Tooltip formatter={(value) => `$${value}`} />
-                <Legend />
-                <Bar dataKey="current_cost" fill="#10B981" name="Current Monthly Cost" />
-                <Bar dataKey="predicted_cost" fill="#F59E0B" name="Predicted Monthly Cost" />
-                <Bar dataKey="savings_opportunity" fill="#3B82F6" name="Potential Savings" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {budgetLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="loading-spinner"></div>
+              <span className="ml-2 text-gray-600">Loading budget analysis...</span>
+            </div>
+          ) : budgetImpactData.length > 0 ? (
+            <div style={{ width: '100%', height: 300 }}>
+              <ResponsiveContainer>
+                <BarChart data={budgetImpactData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="item" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                  <Legend />
+                  <Bar dataKey="current_cost" fill="#10B981" name="Monthly Spend" />
+                  <Bar dataKey="predicted_cost" fill="#F59E0B" name="Waste Cost" />
+                  <Bar dataKey="savings_opportunity" fill="#3B82F6" name="Potential Savings" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-green-600 text-4xl mb-2">💰</div>
+              <p>No waste analysis data available</p>
+              <p className="text-sm mt-2">Upload usage data to see budget impact analysis</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

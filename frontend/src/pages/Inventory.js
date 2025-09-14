@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 const Inventory = () => {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error] = useState(null);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('all');
   const [editingItem, setEditingItem] = useState(null);
@@ -20,7 +20,7 @@ const Inventory = () => {
     expiration_risk: 'Low'
   });
 
-  // const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
   // Sample inventory data
   const sampleInventory = useMemo(() => [
@@ -86,12 +86,48 @@ const Inventory = () => {
     }
   ], []);
 
+  const fetchInventory = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/inventory`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setItems(data.inventory);
+    } catch (err) {
+      console.error('Error fetching inventory:', err);
+      setError(err.message);
+      // Fallback to sample data if API fails
+      setItems(sampleInventory);
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL, sampleInventory]);
+
   useEffect(() => {
-    // Load inventory data immediately
-    setLoading(true);
-    setItems(sampleInventory);
-    setLoading(false);
-  }, [sampleInventory]);
+    fetchInventory();
+  }, [fetchInventory]);
+
+  // Listen for window focus to refresh data when user returns
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchInventory();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchInventory]);
+
+  // Listen for custom events from successful imports
+  useEffect(() => {
+    const handleInventoryUpdate = () => {
+      fetchInventory();
+    };
+
+    window.addEventListener('inventoryUpdated', handleInventoryUpdate);
+    return () => window.removeEventListener('inventoryUpdated', handleInventoryUpdate);
+  }, [fetchInventory]);
 
   const getStockStatus = (current, min, max) => {
     if (current <= min * 0.5) return 'critical';
@@ -125,6 +161,19 @@ const Inventory = () => {
 
   const handleSave = async (item, field, value) => {
     try {
+      // Update backend API
+      const response = await fetch(`${API_BASE_URL}/inventory/${encodeURIComponent(item.item_name)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ [field]: parseFloat(value) || value }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       // Update local state
       const updatedItems = items.map(i =>
         i.id === item.id ? { ...i, [field]: parseFloat(value) || value } : i
@@ -132,11 +181,11 @@ const Inventory = () => {
       setItems(updatedItems);
       setEditingItem(null);
       setEditingField(null);
-
-      // TODO: Send update to backend API
-      console.log(`Updated item ${item.id}: ${field} = ${value}`);
     } catch (error) {
       console.error('Error updating item:', error);
+      // Reset editing state on error
+      setEditingItem(null);
+      setEditingField(null);
     }
   };
 
@@ -147,12 +196,23 @@ const Inventory = () => {
 
   const handleAddNew = async () => {
     try {
-      const newItemWithId = {
-        ...newItem,
-        id: Math.max(...items.map(i => i.id), 0) + 1,
-        usage_rate: 0
-      };
-      setItems([...items, newItemWithId]);
+      // Send to backend API
+      const response = await fetch(`${API_BASE_URL}/inventory`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newItem),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Refresh inventory data
+      await fetchInventory();
+
+      // Reset form
       setNewItem({
         item_name: '',
         category: '',
@@ -164,9 +224,6 @@ const Inventory = () => {
         expiration_risk: 'Low'
       });
       setShowAddForm(false);
-
-      // TODO: Send to backend API
-      console.log('Added new item:', newItemWithId);
     } catch (error) {
       console.error('Error adding item:', error);
     }
@@ -236,12 +293,21 @@ const Inventory = () => {
             <h1 className="text-3xl font-bold text-gray-900">Inventory Management</h1>
             <p className="mt-2 text-gray-600">Manage your healthcare inventory items and stock levels - click any value to edit</p>
           </div>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            Add New Item
-          </button>
+          <div className="flex space-x-3">
+            <button
+              onClick={fetchInventory}
+              className="px-4 py-2 bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              disabled={loading}
+            >
+              {loading ? 'Refreshing...' : 'Refresh'}
+            </button>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Add New Item
+            </button>
+          </div>
         </div>
       </div>
 

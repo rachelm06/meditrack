@@ -37,8 +37,11 @@ class InventoryItem(BaseModel):
     item_name: str
     category: str
     current_stock: int
-    usage_rate: float
+    min_stock_level: int
+    max_stock_level: int
     cost_per_unit: float
+    supplier: str
+    expiration_risk: str
 
 class ReorderSuggestion(BaseModel):
     item_name: str
@@ -147,11 +150,38 @@ async def classify_items():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/inventory")
+async def get_inventory():
+    """Get all inventory items"""
+    try:
+        inventory_data = db_manager.get_current_inventory()
+        return {"inventory": inventory_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/inventory/{item_name}")
+async def update_inventory_item(item_name: str, updates: dict):
+    """Update an inventory item"""
+    try:
+        db_manager.update_inventory_item(item_name, updates)
+        return {"message": f"Item '{item_name}' updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/inventory")
+async def add_inventory_item(item: InventoryItem):
+    """Add a new inventory item"""
+    try:
+        db_manager.add_inventory_item(item.dict())
+        return {"message": f"Item '{item.item_name}' added successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/dashboard_metrics")
 async def get_dashboard_metrics():
     try:
         inventory_data = db_manager.get_current_inventory()
-        total_items = len(inventory_data)
+        total_items = sum(item["current_stock"] for item in inventory_data)  # Sum of all quantities, not count of categories
         low_stock_items = len([item for item in inventory_data if item["usage_rate"] > 0 and item["current_stock"] / item["usage_rate"] < 14])
         total_value = sum(item["current_stock"] * item["cost_per_unit"] for item in inventory_data)
 
@@ -247,13 +277,13 @@ async def get_import_templates():
     """Get sample CSV templates for data import"""
     inventory_template = {
         "filename": "inventory_template.csv",
-        "headers": ["item_name", "category", "current_stock", "min_stock_level",
+        "headers": ["item_name", "category", "number_items", "min_stock_level",
                    "max_stock_level", "cost_per_unit", "supplier", "expiration_risk"],
         "sample_data": [
             {
                 "item_name": "N95 Masks",
                 "category": "PPE",
-                "current_stock": 500,
+                "number_items": 500,
                 "min_stock_level": 100,
                 "max_stock_level": 1000,
                 "cost_per_unit": 2.50,
