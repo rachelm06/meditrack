@@ -18,9 +18,46 @@ function App() {
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
-              <div className="flex items-center">
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Smart Healthcare Inventory
+              <div className="flex items-center space-x-3">
+                {/* MEDITRACK Logo */}
+                <div className="flex items-center">
+                  <svg
+                    width="40"
+                    height="40"
+                    viewBox="0 0 120 120"
+                    className="flex-shrink-0"
+                  >
+                    {/* Logo SVG - recreated from the uploaded image */}
+                    <defs>
+                      <linearGradient id="heartGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#22C55E" />
+                        <stop offset="100%" stopColor="#1E40AF" />
+                      </linearGradient>
+                    </defs>
+
+                    {/* Main heart shape */}
+                    <path
+                      d="M60 25C45 10, 15 10, 15 40C15 70, 60 105, 60 105C60 105, 105 70, 105 40C105 10, 75 10, 60 25Z"
+                      fill="url(#heartGradient)"
+                    />
+
+                    {/* Medical cross */}
+                    <rect x="52" y="30" width="16" height="8" fill="white" rx="2"/>
+                    <rect x="56" y="26" width="8" height="16" fill="white" rx="2"/>
+
+                    {/* Pulse line */}
+                    <path
+                      d="M15 55 L25 55 L30 45 L35 65 L40 35 L45 75 L50 55 L105 55"
+                      stroke="white"
+                      strokeWidth="2"
+                      fill="none"
+                    />
+                  </svg>
+                </div>
+
+                {/* Brand name */}
+                <h1 className="text-2xl font-bold text-blue-600">
+                  MEDITRACK
                 </h1>
               </div>
               <div className="flex items-center space-x-4">

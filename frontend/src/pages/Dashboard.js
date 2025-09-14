@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import AIAgent from '../components/AIAgent';
 import EmergencyAlerts from '../components/EmergencyAlerts';
 
@@ -84,7 +83,7 @@ const Dashboard = () => {
       <div className="mb-8">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Healthcare Inventory Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Inventory Dashboard</h1>
             <p className="mt-2 text-gray-600">Monitor your inventory levels, usage patterns, and predictions</p>
           </div>
           <button
@@ -104,39 +103,6 @@ const Dashboard = () => {
             <div className="ml-3">
               <h3 className="text-red-800 font-medium">Error</h3>
               <p className="text-red-700 text-sm mt-1">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* AI Assistant Promotion Banner */}
-      {!aiAgentOpen && (
-        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center animate-pulse">
-                <ChatBubbleLeftRightIcon className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-blue-900">New: AI Supply Chain Assistant</h3>
-                <p className="text-sm text-blue-700">
-                  Get instant answers about emergency purchases, trends, and supply forecasts
-                </p>
-              </div>
-            </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setAiAgentOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
-              >
-                Try Now
-              </button>
-              <button
-                onClick={() => setAiAgentOpen(true)}
-                className="text-blue-600 hover:text-blue-800 text-sm underline"
-              >
-                See bottom-right corner →
-              </button>
             </div>
           </div>
         </div>
