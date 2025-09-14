@@ -12,6 +12,7 @@ from api_clients.knot_client import KnotClient
 from api_clients.cerebras_client import CerebrasClient
 from database.db_manager import DatabaseManager
 from import_manager import ImportManager
+from api.hospital_network_api import router as network_router
 
 app = FastAPI(title="Smart Healthcare Inventory Dashboard", version="1.0.0")
 
@@ -22,6 +23,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include hospital network router
+app.include_router(network_router)
 
 db_manager = DatabaseManager()
 demand_predictor = DemandPredictor()

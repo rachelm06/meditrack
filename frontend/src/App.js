@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import Predictions from './pages/Predictions';
 import Import from './pages/Import';
+import HospitalNetwork from './pages/HospitalNetwork';
 import './App.css';
 
 function App() {
@@ -76,6 +77,17 @@ function App() {
               >
                 Import Data
               </Link>
+              <Link
+                to="/network"
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'network'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setActiveTab('network')}
+              >
+                Hospital Network
+              </Link>
             </div>
           </div>
         </nav>
@@ -87,6 +99,7 @@ function App() {
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/predictions" element={<Predictions />} />
             <Route path="/import" element={<Import />} />
+            <Route path="/network" element={<HospitalNetwork />} />
           </Routes>
         </main>
       </div>
